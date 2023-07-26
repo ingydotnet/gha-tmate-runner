@@ -1,0 +1,37 @@
+on: push
+jobs:
+  tmate:
+    # runs-on: macos-11
+    # runs-on: macos-12
+    # runs-on: macos-12-xl
+    # runs-on: macos-13
+    # runs-on: macos-13-xl
+    # runs-on: macos-latest
+    # runs-on: macos-latest-xl
+    # runs-on: ubuntu-20.04
+    # runs-on: ubuntu-22.04
+    # runs-on: ubuntu-latest
+
+    runs-on: windows-2019
+    strategy:
+      matrix:
+        type:
+          - 'mingw64'
+    defaults:
+      run:
+        shell: msys2 {0}
+
+    # runs-on: windows-2022
+    # runs-on: windows-latest
+
+    steps:
+    - uses: msys2/setup-msys2@v2
+      if: matrix.type == 'mingw64'
+      with:
+        msystem: 'mingw64'
+        release: false
+        pacboy: perl:p
+    - run: curl -L https://cpanmin.us | perl - -nq App::cpanminus
+    - run: cpanm --verbose YAML::XS
+    - uses: mxschmitt/action-tmate@v3
+      if: ${{ always() }}
