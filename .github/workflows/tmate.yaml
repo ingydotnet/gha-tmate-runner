@@ -17,6 +17,7 @@ jobs:
       matrix:
         type:
           - 'mingw64'
+          - 'strawberry'
     defaults:
       run:
         shell: msys2 {0}
@@ -25,13 +26,52 @@ jobs:
     # runs-on: windows-latest
 
     steps:
-    - uses: msys2/setup-msys2@v2
+    - name: For MinGW64, install Perl package
+      uses: msys2/setup-msys2@v2
       if: matrix.type == 'mingw64'
       with:
         msystem: 'mingw64'
         release: false
         pacboy: perl:p
-    - run: curl -L https://cpanmin.us | perl - -nq App::cpanminus
-    - run: cpanm --verbose YAML::XS
+    - name: For Strawberry, just have MSYS2 ready
+      uses: msys2/setup-msys2@v2
+      if: matrix.type == 'strawberry'
+      with:
+        msystem: 'mingw64'
+        release: false
+
+    # Clean up the PATH
+    - name: Remove Strawberry Perl from PATH
+      run: |
+        echo $PATH | tr ':' '\n' | grep -vi strawberry  | xargs -n1 -d'\n' cygpath -w > $GITHUB_PATH
+    - run: |
+        if [ "${{ matrix.type }}" = "mingw64" ]; then
+          export MYPERL="/mingw64/bin/perl"
+          export MYPERL_PATH=""
+        elif [ "${{ matrix.type }}" = "strawberry" ]; then
+          export MYPERL="/c/Strawberry/perl/bin/perl"
+          export MYPERL_PATH="/c/Strawberry/c/bin:/c/Strawberry/perl/site/bin:/c/Strawberry/perl/bin"
+        else
+          echo "Unknown type"
+          exit 1;
+        fi
+        echo "MYPERL=$MYPERL" >> $GITHUB_ENV
+        echo "MYPERL_PATH=$MYPERL_PATH" >> $GITHUB_ENV
+
+    - name: Perl version
+      run: |
+        export PATH=$MYPERL_PATH:$PATH
+        $MYPERL -V
+
+    - name: For MinGW64, install cpanm (Strawberry Perl already has it)
+      if: matrix.type == 'mingw64'
+      run: |
+        export PATH=$MYPERL_PATH:$PATH
+        curl -L https://cpanmin.us | $MYPERL - -nq App::cpanminus
+
+    - run: |
+        export PATH=$MYPERL_PATH:$PATH
+        $MYPERL -S cpanm --verbose YAML::XS
+
     - uses: mxschmitt/action-tmate@v3
-      if: ${{ always() }}
+      if: ${{ failure() }}
